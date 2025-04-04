@@ -1,8 +1,10 @@
 import json
+from tabulate import tabulate
 
-# TODO: sort this shit out, ugh
 class Round:
-    pass
+    def __init__(self, round_json):
+        self.round_json = round_json
+
 
 class Game:
     def __init__(self, map_name, total_rounds, timestamp, team_name_one, team_id_one, team_name_two, team_id_two):
@@ -50,8 +52,11 @@ class Player:
         self.kills = 0
         self.deaths = 0
         self.headshots = 0
-        self.kd = None
+        self.kd_percent = None
+        self.kd_plus_minus = None
         self.headshot_percentage = None
+        self.kpr = None
+        self.kost_round_count = 0
         self.kost = None
         self.entry_kills = 0
         self.entry_deaths = 0
@@ -60,9 +65,11 @@ class Player:
         self.trade_kills = 0
         self.trade_deaths = 0
         self.trade_diff = None
-        self.clutches = 0
+        self.clutches = 0 # 1vX's
         self.plants = 0
         self.defuses = 0
+        self.rating = None
+        self.kost_flag = False
 
     def print(self):
         for key, value in vars(self).items():
@@ -71,10 +78,58 @@ class Player:
     def lim_print(self):
         print(self.username, self.kills, self.deaths, self.kd)
 
-class Round:
-    """
-    Store the round data for later data manipulation if desired.
-    """
+    def reset_kost_flag(self):
+        self.kost_flag = False
+
+    def increase_kost(self):
+        if not self.kost_flag:
+            self.kost_round_count += 1
+            self.kost_flag = True
+
+    def calc_kd_percent(self):
+        if self.kills != 0 and self.deaths != 0:
+            self.kd_percent = round(self.kills / self.deaths, 2)
+        else:
+            self.kd_percent = 0
+
+    def calc_kd_plus_minus(self):
+        if self.kills != 0 and self.deaths != 0:
+            self.kd_plus_minus = self.kills - self.deaths
+        else:
+            self.kd_plus_minus = 0
+
+    def calc_headshot_percentage(self):
+        if self.headshots != 0 and self.kills != 0:
+            self.headshot_percentage = round(self.headshots / self.kills, 2)
+        else:
+            self.headshot_percentage = 0
+
+    def calc_kpr(self, total_rounds):
+        if self.kills != 0:
+            self.kpr = round(self.kills / total_rounds, 2)
+        else:
+            self.kpr = 0
+
+    def calc_kost(self, total_rounds):
+        if self.kost_round_count != 0 and total_rounds != 0:
+            self.kost = round(self.kost_round_count / total_rounds, 2)
+        else:
+            self.kost = 0
+
+    def calc_entry_diff(self):
+        self.entry_diff = self.entry_kills - self.entry_deaths
+
+    def calc_survival(self, total_rounds):
+        if self.deaths != 0 and total_rounds != 0:
+            self.survival = round((total_rounds - self.deaths) / total_rounds, 2)
+        else:
+            self.survival = 0
+
+    def calc_trade_diff(self):
+        self.trade_diff = self.trade_kills - self.trade_deaths
+
+    def calc_rating(self):
+        self.rating = 0.037 + 0.004 * self.entry_kills - 0.005 * self.entry_deaths + 0.714 * self.kpr + 0.492 * self.survival + 0.471 * self.kost + 0.026 * self.clutches + 0.015 * self.plants + 0.019 * self.defuses
 
 def init_game(data):
     """
@@ -114,16 +169,16 @@ def init_teams(data, game):
         else:
             team_1.add_player(player_obj)
 
-def parse_round_data(data):
+def parse_round_data(data, game):
     """
     Parses through all the game rounds
     :param data:
     :return:
     """
     for round_info in data.get("rounds", []):
-        print(f"Game Version: {round_info['gameVersion']}")
-        print(f"Site: {round_info['site']}")
-        print(f"Round Number: {round_info['roundNumber']}")
+        # print(f"Game Version: {round_info['gameVersion']}")
+        # print(f"Site: {round_info['site']}")
+        # print(f"Round Number: {round_info['roundNumber']}")
 
         # Player dictionary for fast lookups
         player_lookup = {player.username: player for team in game.teams for player in team.players}
@@ -136,6 +191,9 @@ def parse_round_data(data):
 
         # Add entry kills/deaths then regular kills/deaths
         round_log = round_info['matchFeedback']
+
+        for player in player_lookup.values():
+            player.reset_kost_flag()
 
         kill_events = [event for event in round_info['matchFeedback'] if event['type']['name'] == 'Kill']
 
@@ -163,7 +221,7 @@ def parse_round_data(data):
             if event['headshot']:
                 killer.headshots += 1
 
-            # Edge case?
+            # Edge case? TODO:
             if player_with_kill == player_with_death:
                 print(f"{player_with_kill} killed themselves?!?!")
 
@@ -181,58 +239,123 @@ def parse_round_data(data):
                     victim.trade_deaths += 1
                     break
 
-                print(event)
-                print(next_kill)
-                print()
+                # print(event)
+                # print(next_kill)
+                # print()
 
                 # You get a kill, enemy then kills you
                 if killer == next_victim:
                     next_killer.trade_kills += 1
+                    victim.increase_kost()
                     break
 
-        # Add plants
+            killer.increase_kost()
+
+        # Add plants/defuses (Increase Kost)
         plant_events = [event for event in round_info['matchFeedback'] if event['type']['name'] == 'DefuserPlantComplete']
-        for i, event in enumerate(plant_events):
-            player_with_plant = event['username']
-            player_lookup.get(player_with_plant).defuses += 1
+        for event in round_log:
+            # print(event)
+            if event['type']['name'] == 'DefuserPlantComplete':
+                player_with_plant = event['username']
+                player_lookup.get(player_with_plant).plants += 1
+                player_lookup.get(player_with_plant).increase_kost()
+
+            elif event['type']['name'] == 'DefuserDisableComplete':
+                player_with_defuse = event['username']
+                player_lookup.get(player_with_defuse).defuses += 1
+                player_lookup.get(player_with_defuse).increase_kost()
+
+
+        # Check if player survived (increase KOST)
+        stats = round_info['stats']
+
+        for stat in stats:
+            # print(stat)
+            if stat['died'] is False:
+                temp = stat['username']
+                player_lookup.get(temp).increase_kost()
+
+        # Check if player clutched (1vX)
+        # If player is the last alive, that means they won a 1vX
+        alive_players_team_0 = []
+        alive_players_team_1 = []
+
+        for stat in stats:
+            player = player_lookup.get(stat['username'])
+            if player:
+                if player in game.teams[0].players and stat['died'] is False:
+                    alive_players_team_0.append(player.username)
+                elif player in game.teams[1].players and stat['died'] is False:
+                    alive_players_team_1.append(player.username)
+
+        if team_that_won == 0 and len(alive_players_team_0) == 1:
+            clutch_player = player_lookup.get(alive_players_team_0[0])
+            if clutch_player:
+                clutch_player.clutches += 1
+        elif team_that_won == 1 and len(alive_players_team_1) == 1:
+            clutch_player = player_lookup.get(alive_players_team_1[0])
+            if clutch_player:
+                clutch_player.clutches += 1
 
 
 
-        # print("\nTeams:")
-        # for team in round_info["teams"]:
-        #     print(f"  - {team['name']} (Role: {team['role']}) | Score: {team['score']}")
-        #
-        # print("\nPlayers:")
-        # for player in round_info["players"]:
-        #     print(f"  - {player['username']} ({player['operator']['name']}) - Team Index: {player['teamIndex']}")
-        #
-        # print("\nKills:")
-        # for event in round_info.get("matchFeedback", []):
-        #     if event["type"]["name"] == "Kill":
-        #         print(f"  - {event['username']} killed {event['target']} ({'Headshot' if event['headshot'] else 'Bodyshot'}) at {event['time']}")
-        #
-        # print("\nPlayer Stats:")
-        # for stat in round_info.get("stats", []):
-        #     print(f"  - {stat['username']}: {stat['kills']} Kills, {stat['headshots']} Headshots, Died: {stat['died']}")
-        # print("\n" + "-"*50 + "\n")
+def calc_final_player_data(game):
+    player_lookup = {player.username: player for team in game.teams for player in team.players}
 
-# Example usage
-if __name__ == "__main__":
+    for player in player_lookup.values():
+        player.calc_kd_percent()
+        player.calc_kd_plus_minus()
+        player.calc_headshot_percentage()
+        player.calc_kpr(game.total_rounds)
+        player.calc_kost(game.total_rounds)
+        player.calc_entry_diff()
+        player.calc_survival(game.total_rounds)
+        player.calc_trade_diff()
+        player.calc_rating()
+
+# temp
+def print_team_stats(team):
+    print(f"\n{team.team_name} Stats:")
+
+    headers = ["Username", "Rating", "K-D(+/-)", "K/D %", "Headshots", "KPR", "KOST", "Entry Kills", "Entry Deaths", "Entry Diff", "Survival", "Trade Kills", "Trade Deaths", "Trade Diff", "Clutches", "Plants", "Defuses"]
+
+    player_data = []
+    for player in team.players:
+        player_data.append([
+            player.username,
+            f"{player.rating:.2f}",
+            f"{player.kills}-{player.deaths}({player.kd_plus_minus})",
+            player.kd_percent,
+            f"{player.headshot_percentage * 100:.0f}%",
+            f"{player.kpr:.2f}",
+            f"{player.kost * 100:.0f}%",
+            player.entry_kills,
+            player.entry_deaths,
+            player.entry_diff,
+            f"{player.survival * 100:.0f}%",
+            player.trade_kills,
+            player.trade_deaths,
+            player.trade_diff,
+            player.clutches,
+            player.plants,
+            player.defuses
+        ])
+
+    print(tabulate(player_data, headers=headers, tablefmt="pretty"))
+
+def run():
     with open("game.json", "r") as file:
         data = json.load(file)
         game = init_game(data)
         init_teams(data, game)
-        parse_round_data(data)
+        parse_round_data(data, game)
 
-        # game.print()
+        calc_final_player_data(game)
 
-        game.teams[0].print()
-        print()
-        game.teams[0].print_players()
-        # game.teams[0].players[2].print()
+        print_team_stats(game.teams[0])
+        print_team_stats(game.teams[1])
 
-        print()
+        return game, data
 
-        game.teams[1].print()
-        print()
-        game.teams[1].print_players()
+
+run()
