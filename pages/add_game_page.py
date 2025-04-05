@@ -1,11 +1,10 @@
 import os
-import sqlite3
 from datetime import datetime
 import subprocess
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit, QComboBox, QLineEdit
+from PyQt6.QtWidgets import QVBoxLayout, QPushButton, QLabel, QTextEdit, QComboBox, QLineEdit
 
-import analyser
+from tools import analyser
 from pages.page_template import PageTemplate
 
 class AddGamePage(PageTemplate):

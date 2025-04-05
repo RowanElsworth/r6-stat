@@ -1,9 +1,9 @@
 import sys
 from PyQt6.QtWidgets import QApplication, QStackedWidget, QMainWindow
 
-from db_helper import DBHelper
+from tools.db_helper import DBHelper
 from pages.add_game_page import AddGamePage
-from pages.main_page import MainPage
+from pages.select_team_page import MainPage
 from pages.view_stats_page import ViewStatsPage
 from pages.view_team_page import ViewTeamPage
 
