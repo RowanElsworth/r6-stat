@@ -24,12 +24,13 @@ class DBHelper:
     def get_players(self):
         try:
             self.connect()
-            query = "SELECT name FROM team_players"
+            query = "SELECT name, aliases FROM team_players"
             self.cursor.execute(query)
             players = self.cursor.fetchall()
             self.close()
-            return [player[0] for player in players]
+            return [{'name': name, 'aliases': aliases} for name, aliases in players]
         except sqlite3.Error as e:
+            self.close()
             return [f"Error querying {self.db_path}: {e}"]
 
     def get_competition_types(self):
@@ -37,11 +38,11 @@ class DBHelper:
             self.connect()
             query = "SELECT type FROM competition_types"
             self.cursor.execute(query)
-            players = self.cursor.fetchall()
-            self.conn.commit()
+            types = self.cursor.fetchall()
             self.close()
-            return [player[0] for player in players]
+            return [t[0] for t in types]
         except sqlite3.Error as e:
+            self.close()
             return [f"Error querying {self.db_path}: {e}"]
 
     def insert_new_competition_type(self, competition_type):
@@ -52,6 +53,7 @@ class DBHelper:
             self.conn.commit()
             self.close()
         except sqlite3.Error as e:
+            self.close()
             return [f"Error querying {self.db_path}: {e}"]
 
     def insert_new_game(self, game_name, game_type, series):
@@ -111,6 +113,21 @@ class DBHelper:
             self.close()
             print(f"Error inserting team: {e}")
             return None
+
+    def update_team(self, data):
+        try:
+            for name, aliases in data:
+                self.connect()
+                query = "UPDATE team_players SET name = ?, aliases = ? WHERE id = ?"
+                self.cursor.execute(query, (name, aliases))
+                self.conn.commit()
+
+            self.close()
+            return True
+        except sqlite3.Error as e:
+            self.close()
+            print(f"Error updating team: {e}")
+            return False
 
     def insert_new_player(self, username, team_id, kills, deaths, headshots, kd_percent, kd_plus_minus,
                           headshot_percentage, kpr, kost, kost_round_count, entry_kills,
@@ -223,6 +240,10 @@ class DBHelper:
             )
         """)
 
+        conn.commit()
+
+        query = "INSERT INTO competition_types (type) VALUES (?)"
+        cursor.execute(query, "Scrim") # Init scrim type
         conn.commit()
 
         for player in players:

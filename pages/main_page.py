@@ -25,7 +25,6 @@ class MainPage(PageTemplate):
 
     def on_activated(self):
         self.team, self.players = self.main_window.get_team()
-        print(self.team, self.players)
 
     def fetch_players(self):
         data_directory = './data'
@@ -45,7 +44,9 @@ class MainPage(PageTemplate):
             if filename.endswith(".db"):
                 db_path = os.path.join(data_directory, filename)
                 team_name = filename.replace(".db", "")
-                players = self.get_players_from_db(db_path)
+                self.main_window.db.set_db_path(db_path)
+                players = self.main_window.db.get_players()
+                players = [player['name'] for player in players]
                 if players:
                     teams_data.append((team_name, players, db_path))
 
@@ -53,14 +54,16 @@ class MainPage(PageTemplate):
             for team_name, players, db_path in teams_data:
                 team_button_text = f"{team_name}\n{', '.join(players)}"
                 button = QPushButton(team_button_text, self)
-                button.clicked.connect(lambda: (self.main_window.set_team(team_name, players), self.main_window.switch_to_view_team_page()))
+                button.clicked.connect(
+                    lambda _, tn=team_name, pl=players, dp=db_path: (
+                        self.main_window.set_team(tn, pl),
+                        self.main_window.db.set_db_path(dp),
+                        self.main_window.switch_to_view_team_page()
+                    )
+                )
                 self.team_buttons_layout.addWidget(button)
         else:
             self.create_text("No players found in any database.")
-
-    def get_players_from_db(self, db_path):
-        self.main_window.db.set_db_path(db_path)
-        return self.main_window.db.get_players()
 
     def show_add_team_dialog(self):
         dialog = AddTeamDialog(self)

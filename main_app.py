@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QApplication, QStackedWidget, QMainWindow
 from db_helper import DBHelper
 from pages.add_game_page import AddGamePage
 from pages.main_page import MainPage
-from pages.create_team_page import CreateTeamPage
+from pages.view_stats_page import ViewStatsPage
 from pages.view_team_page import ViewTeamPage
 
 
@@ -29,14 +29,14 @@ class MyApp(QMainWindow):
 
         # Pages
         self.main_page = MainPage(self)
-        self.create_team_page = CreateTeamPage(self)
         self.view_team_page = ViewTeamPage(self)
         self.add_game_page = AddGamePage(self)
+        self.view_stats_page = ViewStatsPage(self)
 
         self.stack.addWidget(self.main_page)
-        self.stack.addWidget(self.create_team_page)
         self.stack.addWidget(self.view_team_page)
         self.stack.addWidget(self.add_game_page)
+        self.stack.addWidget(self.view_stats_page)
 
         self.stack.setCurrentWidget(self.main_page)
 
@@ -48,22 +48,22 @@ class MyApp(QMainWindow):
     def switch_to_view_team_page(self):
         self.stack.setCurrentWidget(self.view_team_page)
 
-    def switch_to_create_team_page(self):
-        self.stack.setCurrentWidget(self.create_team_page)
-
     def switch_to_add_game_page(self):
         self.stack.setCurrentWidget(self.add_game_page)
+
+    def switch_to_view_stats_page(self):
+        self.stack.setCurrentWidget(self.view_stats_page)
 
     def on_page_switch(self, index):
         current_page = self.stack.widget(index)
 
         if isinstance(current_page, MainPage):
             current_page.on_activated()
-        elif isinstance(current_page, CreateTeamPage):
-            current_page.on_activated()
         elif isinstance(current_page, ViewTeamPage):
             current_page.on_activated()
         elif isinstance(current_page, AddGamePage):
+            current_page.on_activated()
+        elif isinstance(current_page, ViewStatsPage):
             current_page.on_activated()
 
 
