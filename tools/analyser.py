@@ -7,11 +7,11 @@ class Round:
 
 
 class Game:
-    def __init__(self, map_name, total_rounds, timestamp, team_name_one, team_id_one, team_name_two, team_id_two):
+    def __init__(self, map_name, total_rounds, timestamp, team_name_one, team_id_one, team_side_start_one, team_name_two, team_id_two, team_side_start_two):
         self.map_name = map_name
         self.total_rounds = total_rounds
         self.timestamp = timestamp
-        self.teams = [Team(team_name_one, team_id_one), Team(team_name_two, team_id_two)]
+        self.teams = [Team(team_name_one, team_id_one, team_side_start_one), Team(team_name_two, team_id_two, team_side_start_two)]
         self.rounds = []
 
     def print(self):
@@ -22,11 +22,12 @@ class Game:
         self.rounds.append(game_round)
 
 class Team:
-    def __init__(self, team_name, team_id):
+    def __init__(self, team_name, team_id, side_start):
         self.team_name = team_name
         self.team_id = team_id
         self.rounds_won = 0
         self.rounds_lost = 0
+        self.side_started = side_start
         self.players = []
 
     def print(self):
@@ -88,7 +89,7 @@ class Player:
 
     def calc_kd_percent(self):
         if self.kills != 0 and self.deaths != 0:
-            self.kd_percent = round(self.kills / self.deaths, 2)
+            self.kd_percent = self.kills / self.deaths
         else:
             self.kd_percent = 0
 
@@ -100,19 +101,19 @@ class Player:
 
     def calc_headshot_percentage(self):
         if self.headshots != 0 and self.kills != 0:
-            self.headshot_percentage = round(self.headshots / self.kills, 2)
+            self.headshot_percentage = self.headshots / self.kills
         else:
             self.headshot_percentage = 0
 
     def calc_kpr(self, total_rounds):
         if self.kills != 0:
-            self.kpr = round(self.kills / total_rounds, 2)
+            self.kpr = self.kills / total_rounds
         else:
             self.kpr = 0
 
     def calc_kost(self, total_rounds):
         if self.kost_round_count != 0 and total_rounds != 0:
-            self.kost = round(self.kost_round_count / total_rounds, 2)
+            self.kost = self.kost_round_count / total_rounds
         else:
             self.kost = 0
 
@@ -121,7 +122,7 @@ class Player:
 
     def calc_survival(self, total_rounds):
         if self.deaths != 0 and total_rounds != 0:
-            self.survival = round((total_rounds - self.deaths) / total_rounds, 2)
+            self.survival = (total_rounds - self.deaths) / total_rounds
         else:
             self.survival = 0
 
@@ -145,10 +146,14 @@ def init_game(data):
         round_data['map']['name'],
         total_rounds,
         round_data['timestamp'],
+
         round_data['teams'][0]['name'],
         0,
+        round_data['teams'][0]['role'],
+
         round_data['teams'][1]['name'],
-        1
+        1,
+        round_data['teams'][1]['role'],
     )
 
 def init_teams(data, game):
@@ -315,7 +320,7 @@ def calc_final_player_data(game):
 
 # temp
 def print_team_stats(team):
-    print(f"\n{team.team_name} Stats:")
+    print(f"\n{team.team_name} ({team.side_started}) Stats:")
 
     headers = ["Username", "Rating", "K-D(+/-)", "K/D %", "Headshots", "KPR", "KOST", "Entry Kills", "Entry Deaths", "Entry Diff", "Survival", "Trade Kills", "Trade Deaths", "Trade Diff", "Clutches", "Plants", "Defuses"]
 

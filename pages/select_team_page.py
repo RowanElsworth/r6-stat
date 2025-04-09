@@ -1,21 +1,20 @@
 import os
-
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QDialog, QInputDialog, QDialogButtonBox, \
-    QLineEdit, QMessageBox, QHBoxLayout, QScrollArea
-
+    QLineEdit, QMessageBox, QHBoxLayout, QScrollArea, QTableWidget, QTableWidgetItem
 from pages.page_template import PageTemplate
 
 class MainPage(PageTemplate):
     def __init__(self, main_window):
         super().__init__()
         self.layout = QVBoxLayout()
+        self.layout.setContentsMargins(20, 20, 20, 20)
 
         self.team_buttons_layout = QVBoxLayout()
         self.layout.addLayout(self.team_buttons_layout)
 
         self.add_team_button = QPushButton("Add New Team", self)
+        self.add_team_button.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px; padding: 10px;")
         self.add_team_button.clicked.connect(self.show_add_team_dialog)
-
         self.layout.addWidget(self.add_team_button)
 
         self.main_window = main_window
@@ -45,8 +44,10 @@ class MainPage(PageTemplate):
                 db_path = os.path.join(data_directory, filename)
                 team_name = filename.replace(".db", "")
                 self.main_window.db.set_db_path(db_path)
+
                 players = self.main_window.db.get_players()
                 players = [player['name'] for player in players]
+
                 if players:
                     teams_data.append((team_name, players, db_path))
 
@@ -54,6 +55,7 @@ class MainPage(PageTemplate):
             for team_name, players, db_path in teams_data:
                 team_button_text = f"{team_name}\n{', '.join(players)}"
                 button = QPushButton(team_button_text, self)
+                button.setStyleSheet("background-color: #2196F3; color: white; border-radius: 5px; padding: 10px;")
                 button.clicked.connect(
                     lambda _, tn=team_name, pl=players, dp=db_path: (
                         self.main_window.set_team(tn, pl),
@@ -113,13 +115,16 @@ class AddTeamDialog(QDialog):
         self.setLayout(self.layout)
 
         self.label = QLabel("Enter Team Name:", self)
+        self.label.setStyleSheet("font-size: 16px;")
         self.layout.addWidget(self.label)
 
         self.team_name_input = QLineEdit(self)
         self.team_name_input.setPlaceholderText("Enter team name here")
+        self.team_name_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
         self.layout.addWidget(self.team_name_input)
 
         self.players_label = QLabel("Enter Players and their Aliases:", self)
+        self.players_label.setStyleSheet("font-size: 16px;")
         self.layout.addWidget(self.players_label)
         self.players_widget = QWidget(self)
         self.players_layout = QVBoxLayout(self.players_widget)
@@ -130,10 +135,12 @@ class AddTeamDialog(QDialog):
         self.layout.addWidget(self.scroll_area)
 
         self.add_player_button = QPushButton("Add Player", self)
+        self.add_player_button.setStyleSheet("background-color: #008CBA; color: white; border-radius: 5px; padding: 8px;")
         self.add_player_button.clicked.connect(self.add_player_field)
         self.layout.addWidget(self.add_player_button)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.buttons.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px;")
         self.layout.addWidget(self.buttons)
 
         self.buttons.accepted.connect(self.accept)
@@ -146,8 +153,10 @@ class AddTeamDialog(QDialog):
 
         player_input = QLineEdit(self)
         player_input.setPlaceholderText("Player Name")
+        player_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
         alias_input = QLineEdit(self)
         alias_input.setPlaceholderText("Player Alias (comma separated)")
+        alias_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
 
         player_layout.addWidget(player_input)
         player_layout.addWidget(alias_input)

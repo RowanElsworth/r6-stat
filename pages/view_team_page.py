@@ -1,8 +1,6 @@
 import os
-
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QDialog, QLabel, QLineEdit, QScrollArea, \
     QDialogButtonBox, QHBoxLayout, QMessageBox
-
 from pages.page_template import PageTemplate
 
 class ViewTeamPage(PageTemplate):
@@ -15,31 +13,37 @@ class ViewTeamPage(PageTemplate):
         self.main_window = main_window
 
         self.layout = QVBoxLayout()
+        self.layout.setContentsMargins(20, 20, 20, 20)
 
-        add_bo1_button = QPushButton("BO1", self)
-        add_bo1_button.clicked.connect(lambda: (self.main_window.set_series(1), self.main_window.switch_to_add_game_page()))
-        self.layout.addWidget(add_bo1_button)
+        self.add_bo1_button = QPushButton("BO1", self)
+        self.add_bo1_button.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px; padding: 10px;")
+        self.add_bo1_button.clicked.connect(lambda: (self.main_window.set_series(1), self.main_window.switch_to_add_game_page()))
+        self.layout.addWidget(self.add_bo1_button)
 
-        add_bo2_button = QPushButton("BO2", self)
-        add_bo2_button.clicked.connect(lambda: (self.main_window.set_series(2), self.main_window.switch_to_add_game_page()))
-        self.layout.addWidget(add_bo2_button)
+        self.add_bo2_button = QPushButton("BO2", self)
+        self.add_bo2_button.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px; padding: 10px;")
+        self.add_bo2_button.clicked.connect(lambda: (self.main_window.set_series(2), self.main_window.switch_to_add_game_page()))
+        self.layout.addWidget(self.add_bo2_button)
 
-        add_bo3_button = QPushButton("BO3", self)
-        add_bo3_button.clicked.connect(lambda: (self.main_window.set_series(3), self.main_window.switch_to_add_game_page()))
-        self.layout.addWidget(add_bo3_button)
+        self.add_bo3_button = QPushButton("BO3", self)
+        self.add_bo3_button.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px; padding: 10px;")
+        self.add_bo3_button.clicked.connect(lambda: (self.main_window.set_series(3), self.main_window.switch_to_add_game_page()))
+        self.layout.addWidget(self.add_bo3_button)
 
-        add_bo1_button = QPushButton("View Stats", self)
-        add_bo1_button.clicked.connect(lambda: self.main_window.switch_to_view_stats_page())
-        self.layout.addWidget(add_bo1_button)
+        self.view_stats_button = QPushButton("View Stats", self)
+        self.view_stats_button.setStyleSheet("background-color: #2196F3; color: white; border-radius: 5px; padding: 10px;")
+        self.view_stats_button.clicked.connect(lambda: self.main_window.switch_to_view_stats_page())
+        self.layout.addWidget(self.view_stats_button)
 
-        add_bo1_button = QPushButton("Modify Team (WIP)", self)
-        add_bo1_button.clicked.connect(lambda: print("not working yet"))
-        # add_bo1_button.clicked.connect(lambda: self.show_modify_team_dialog()) # TODO:
-        self.layout.addWidget(add_bo1_button)
+        self.modify_team_button = QPushButton("Modify Team (WIP)", self)
+        self.modify_team_button.setStyleSheet("background-color: #f44336; color: white; border-radius: 5px; padding: 10px;")
+        self.modify_team_button.clicked.connect(lambda: print("not working yet"))
+        self.layout.addWidget(self.modify_team_button)
 
-        btn = QPushButton("Go back")
-        btn.clicked.connect(main_window.switch_to_main_page)
-        self.layout.addWidget(btn)
+        self.go_back_button = QPushButton("Go back", self)
+        self.go_back_button.setStyleSheet("background-color: #9E9E9E; color: white; border-radius: 5px; padding: 10px;")
+        self.go_back_button.clicked.connect(main_window.switch_to_main_page)
+        self.layout.addWidget(self.go_back_button)
 
         self.setLayout(self.layout)
 
@@ -82,7 +86,6 @@ class ViewTeamPage(PageTemplate):
         msg_box.setText(f"Team '{team_name}' updated successfully!")
         msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg_box.exec()
-        # self.fetch_players()
 
 
 class ModifyTeamDialog(QDialog):
@@ -100,14 +103,17 @@ class ModifyTeamDialog(QDialog):
         self.setLayout(self.layout)
 
         self.label = QLabel("Enter Team Name:", self)
+        self.label.setStyleSheet("font-size: 16px;")
         self.layout.addWidget(self.label)
 
         self.team_name_input = QLineEdit(self)
         self.team_name_input.setPlaceholderText("Enter team name here")
         self.team_name_input.setText(team_name)
+        self.team_name_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
         self.layout.addWidget(self.team_name_input)
 
         self.players_label = QLabel("Enter Players and their Aliases:", self)
+        self.players_label.setStyleSheet("font-size: 16px;")
         self.layout.addWidget(self.players_label)
         self.players_widget = QWidget(self)
         self.players_layout = QVBoxLayout(self.players_widget)
@@ -118,10 +124,12 @@ class ModifyTeamDialog(QDialog):
         self.layout.addWidget(self.scroll_area)
 
         self.add_player_button = QPushButton("Add Player", self)
+        self.add_player_button.setStyleSheet("background-color: #008CBA; color: white; border-radius: 5px; padding: 8px;")
         self.add_player_button.clicked.connect(self.add_player_field)
         self.layout.addWidget(self.add_player_button)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.buttons.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px;")
         self.layout.addWidget(self.buttons)
 
         self.buttons.accepted.connect(self.accept)
@@ -138,10 +146,12 @@ class ModifyTeamDialog(QDialog):
         player_input = QLineEdit(self)
         player_input.setPlaceholderText("Player Name")
         player_input.setText(name)
+        player_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
 
         alias_input = QLineEdit(self)
         alias_input.setPlaceholderText("Player Alias (comma separated)")
         alias_input.setText(aliases)
+        alias_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
 
         player_layout.addWidget(player_input)
         player_layout.addWidget(alias_input)

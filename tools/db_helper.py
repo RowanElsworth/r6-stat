@@ -22,13 +22,27 @@ class DBHelper:
             self.conn.close()
 
     def get_players(self):
+        """
+        Gets the players in the selected team.
+
+        :return:
+        Array of Dicts
+        [{'name': 'Spotty', 'aliases': 'Spotty.-,Spotty.PP'}]
+        """
         try:
             self.connect()
-            query = "SELECT name, aliases FROM team_players"
+            query = """
+                SELECT tp.name, GROUP_CONCAT(pa.alias, ',') AS aliases
+                FROM team_players tp
+                LEFT JOIN player_aliases pa ON tp.id = pa.player_id
+                GROUP BY tp.name;
+            """
             self.cursor.execute(query)
             players = self.cursor.fetchall()
             self.close()
+
             return [{'name': name, 'aliases': aliases} for name, aliases in players]
+
         except sqlite3.Error as e:
             self.close()
             return [f"Error querying {self.db_path}: {e}"]
@@ -49,7 +63,7 @@ class DBHelper:
         try:
             self.connect()
             query = "INSERT INTO competition_types (type) VALUES (?)"
-            self.cursor.execute(query, competition_type)
+            self.cursor.execute(query, (competition_type,))
             self.conn.commit()
             self.close()
         except sqlite3.Error as e:
@@ -98,11 +112,11 @@ class DBHelper:
             print(f"Error inserting map: {e}")
             return None
 
-    def insert_new_team(self, team_name, rounds_won, rounds_lost, map_id, team_id):
+    def insert_new_team(self, team_name, rounds_won, rounds_lost, map_id, side_start, team_id):
         try:
             self.connect()
-            query = "INSERT INTO teams (team_name, rounds_won, rounds_lost, map_id, team_id) VALUES (?, ?, ?, ?, ?)"
-            self.cursor.execute(query, (team_name, rounds_won, rounds_lost, map_id, team_id))
+            query = "INSERT INTO teams (team_name, rounds_won, rounds_lost, map_id, side_start, team_id) VALUES (?, ?, ?, ?, ?, ?)"
+            self.cursor.execute(query, (team_name, rounds_won, rounds_lost, map_id, side_start, team_id))
             self.conn.commit()
 
             team_id = self.cursor.lastrowid
@@ -173,8 +187,17 @@ class DBHelper:
 
         cursor.execute("""
             CREATE TABLE team_players (
-                name TEXT NOT NULL,
-                aliases TEXT NOT NULL
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE player_aliases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id INTEGER NOT NULL,
+                alias TEXT NOT NULL,
+                FOREIGN KEY (player_id) REFERENCES team_players(id)
             )
         """)
 
@@ -207,6 +230,7 @@ class DBHelper:
                 rounds_lost INTEGER NOT NULL,
                 map_id INTEGER NOT NULL,
                 team_id INTEGER NOT NULL,
+                side_start TEXT NOT NULL,
                 FOREIGN KEY (map_id) REFERENCES maps(id)
             )
         """)
@@ -243,13 +267,19 @@ class DBHelper:
         conn.commit()
 
         query = "INSERT INTO competition_types (type) VALUES (?)"
-        cursor.execute(query, "Scrim") # Init scrim type
+        cursor.execute(query, ("Scrim",)) # Init scrim type
         conn.commit()
 
         for player in players:
-            query = "INSERT INTO team_players (name, aliases) VALUES (?, ?)"
+            name = player[0]
+            alias_list = [alias.strip() for alias in player[1].split(",")]
 
-            cursor.execute(query, (player[0], player[1]))
+            cursor.execute("INSERT INTO team_players (name) VALUES (?)", (name,))
+            player_id = cursor.lastrowid
+
+            for alias in alias_list:
+                cursor.execute("INSERT INTO player_aliases (player_id, alias) VALUES (?, ?)", (player_id, alias))
+
             conn.commit()
 
         cursor.close()
@@ -258,4 +288,143 @@ class DBHelper:
         print(f"Database {db_path} created successfully!")
 
     def modify_team_details(self):
+        # TODO:
         pass
+
+    def get_map_stats(self):
+        """
+        Gets stats of the maps played
+        :return:
+        """
+        pass
+
+    def get_player_stats(self, game_id, game_type_id, map_id):
+        """
+        Gets the players in the team
+        Outputs these player's stats from a type (Global, Competition, Certain Game)
+        :return:
+        """
+        try:
+            self.connect()
+
+            clauses = ""
+
+            if game_id is not None:
+                clauses = f"WHERE g.id = {game_id}"
+            elif game_type_id is not None:
+                clauses = f"WHERE g.game_type_id = {game_type_id}"
+            elif map_id is not None:
+                clauses = f"WHERE m.id = {map_id}"
+
+            query = f"""
+                SELECT
+                    tp.name AS username,
+                    AVG(p.rating) AS avg_rating,
+                    SUM(p.kills) AS total_kills,
+                    SUM(p.deaths) AS total_deaths,
+                    SUM(kd_plus_minus) AS avg_kd_plus_minus,
+                    CASE
+                        WHEN SUM(p.kills) = 0 THEN 0
+                        WHEN SUM(p.deaths) = 0 THEN SUM(p.kills)
+                        ELSE CAST(SUM(p.kills) AS REAL) / CAST(SUM(p.deaths) AS REAL)
+                    END AS avg_kd_percent,
+                    CASE
+                        WHEN SUM(p.headshots) = 0 THEN 0
+                        ELSE CAST(SUM(p.headshots) AS REAL) / CAST(SUM(p.kills) AS REAL)
+                    END AS avg_headshot_percentage,
+                    AVG(p.kpr) AS avg_kpr,
+                    CASE
+                        WHEN SUM(p.kost_round_count) = 0 THEN 0
+                        ELSE CAST(SUM(p.kost_round_count) AS REAL) / SUM(m.total_rounds)
+                    END AS avg_kost,
+                    SUM(p.entry_kills) AS total_entry_kills,
+                    SUM(p.entry_deaths) AS total_entry_deaths,
+                    SUM(p.entry_diff) AS total_entry_diff,
+                    CASE
+                        WHEN SUM(p.deaths) = 0 THEN 100
+                        ELSE CAST((SUM(m.total_rounds) - SUM(p.deaths)) AS REAL) / SUM(m.total_rounds)
+                    END AS total_survival,
+                    SUM(p.trade_kills) AS total_trade_kills,
+                    SUM(p.trade_deaths) AS total_trade_deaths,
+                    SUM(p.trade_diff) AS total_trade_diff,
+                    SUM(p.clutches) AS total_clutches,
+                    SUM(p.plants) AS total_plants,
+                    SUM(p.defuses) AS total_defuses
+                FROM players p
+                JOIN teams t ON p.team_id = t.id
+                JOIN maps m ON t.map_id = m.id
+                JOIN games g ON m.game_id = g.id
+                JOIN player_aliases pa ON pa.alias = p.username
+                JOIN team_players tp ON tp.id = pa.player_id
+                {clauses}
+                GROUP BY tp.name
+                ORDER BY avg_rating DESC;
+            """
+
+            self.cursor.execute(query)
+            data = self.cursor.fetchall()
+            self.close()
+
+            return data
+        except sqlite3.Error as e:
+            self.close()
+            return [f"Error querying {self.db_path}: {e}"]
+
+    def get_map_stats(self, game_id, game_type_id, map_id):
+        try:
+            self.connect()
+
+            clauses = ""
+
+            if game_id is not None:
+                clauses = f"WHERE g.id = {game_id}"
+            elif game_type_id is not None:
+                clauses = f"WHERE g.game_type_id = {game_type_id}"
+            elif map_id is not None:
+                clauses = f"WHERE m.id = {map_id}"
+
+            query = f"""
+                WITH player_matches AS (
+                    SELECT DISTINCT
+                        t.id AS team_id,
+                        t.map_id,
+                        m.map_name,
+                        t.rounds_won,
+                        t.rounds_lost,
+                        (t.rounds_won + t.rounds_lost) AS rounds_played
+                    FROM player_aliases pa
+                    JOIN team_players tp ON tp.id = pa.player_id
+                    JOIN players p ON p.username = pa.alias
+                    JOIN teams t ON p.team_id = t.id
+                    JOIN maps m ON m.id = t.map_id
+                    JOIN games g ON m.game_id = g.id
+                    {clauses}
+                ),
+                all_rounds AS (
+                    SELECT SUM(rounds_played) AS total_rounds
+                    FROM player_matches
+                )
+                
+                SELECT
+                    pm.map_name AS "Map Name",
+                    COUNT(DISTINCT pm.map_id) AS "Played",
+                    COUNT(DISTINCT CASE WHEN pm.rounds_won > pm.rounds_lost THEN pm.map_id END) AS "Won",
+                    COUNT(DISTINCT CASE WHEN pm.rounds_won > pm.rounds_lost THEN pm.map_id END) * 100.0 / COUNT(DISTINCT pm.map_id) AS "Map Win %",
+                    SUM(pm.rounds_played) AS "Rounds Played",
+                    SUM(pm.rounds_won) AS "Rounds Won",
+                    SUM(pm.rounds_won) * 100.0 / NULLIF(SUM(pm.rounds_played), 0) AS "Round Win %",
+                    ROUND(SUM(pm.rounds_played) * 100.0 / ar.total_rounds, 1) AS "% Playtime"
+                FROM player_matches pm
+                JOIN all_rounds ar ON 1=1
+                GROUP BY pm.map_name
+                ORDER BY pm.map_name;
+            """
+
+            self.cursor.execute(query)
+            data = self.cursor.fetchall()
+            self.close()
+
+            return data
+        except sqlite3.Error as e:
+            self.close()
+            return [f"Error querying {self.db_path}: {e}"]
