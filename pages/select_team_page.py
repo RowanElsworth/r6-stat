@@ -1,6 +1,8 @@
 import os
+
+from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QDialog, QInputDialog, QDialogButtonBox, \
-    QLineEdit, QMessageBox, QHBoxLayout, QScrollArea, QTableWidget, QTableWidgetItem
+    QLineEdit, QMessageBox, QHBoxLayout, QScrollArea, QTableWidget, QTableWidgetItem, QFileDialog
 from pages.page_template import PageTemplate
 
 class MainPage(PageTemplate):
@@ -20,17 +22,47 @@ class MainPage(PageTemplate):
         self.main_window = main_window
         self.setLayout(self.layout)
 
+        self.start_up()
+
         self.fetch_players()
 
     def on_activated(self):
         self.team, self.players = self.main_window.get_team()
+        self.fetch_players()
+
+    def start_up(self):
+        data_directory = './r6-stat_data'
+
+        os.makedirs(data_directory, exist_ok=True)
+
+        settings = QSettings("R6Stat", "R6Stat")
+
+        # if default path doesn't exist
+        if not settings.value("default_path"):
+            settings.setValue("default_path", r"C:\Program Files (x86)\Steam\steamapps\common\Tom Clancy's Rainbow Six Siege\MatchReplay")
+
+        # if the MatchReplay folder doesn't exist (not the right location)
+        if not os.path.isdir(settings.value("default_path")):
+            QMessageBox.information(
+                self, "Directory Not Found",
+                "The default replay directory was not found.\nPlease select the `MatchReplay` directory."
+            )
+
+            selected_dir = QFileDialog.getExistingDirectory(
+                self, "Select Data Directory", os.getcwd()
+            )
+
+            if selected_dir and os.path.normpath(selected_dir).endswith(r"Tom Clancy's Rainbow Six Siege\MatchReplay"):
+                settings.setValue("default_path", selected_dir)
+            else:
+                QMessageBox.warning(
+                    self, "No Directory Selected",
+                    "No valid directory was selected. The program will exit."
+                )
+                exit(1)
 
     def fetch_players(self):
-        data_directory = './data'
-
-        if not os.path.isdir(data_directory):
-            self.create_text("Directory not found: ./data")
-            return
+        data_directory = './r6-stat_data'
 
         teams_data = []
 
@@ -65,7 +97,7 @@ class MainPage(PageTemplate):
                 )
                 self.team_buttons_layout.addWidget(button)
         else:
-            self.create_text("No players found in any database.")
+            self.create_text("No teams found. Click 'Add New Team' to add a new team.")
 
     def show_add_team_dialog(self):
         dialog = AddTeamDialog(self)

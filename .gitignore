@@ -1,3 +1,9 @@
-.idea
-__pycache__
-data/
+.idea/
+
+__pycache__/
+*.pyc
+
+r6-stat_data/
+dist/
+build/
+*.spec

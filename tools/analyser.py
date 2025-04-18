@@ -361,6 +361,3 @@ def run():
         print_team_stats(game.teams[1])
 
         return game, data
-
-
-# run()

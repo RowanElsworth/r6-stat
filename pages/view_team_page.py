@@ -35,9 +35,9 @@ class ViewTeamPage(PageTemplate):
         self.view_stats_button.clicked.connect(lambda: self.main_window.switch_to_view_stats_page())
         self.layout.addWidget(self.view_stats_button)
 
-        self.modify_team_button = QPushButton("Modify Team (WIP)", self)
+        self.modify_team_button = QPushButton("Modify Team", self)
         self.modify_team_button.setStyleSheet("background-color: #f44336; color: white; border-radius: 5px; padding: 10px;")
-        self.modify_team_button.clicked.connect(lambda: print("not working yet"))
+        self.modify_team_button.clicked.connect(lambda: self.show_modify_team_dialog())
         self.layout.addWidget(self.modify_team_button)
 
         self.go_back_button = QPushButton("Go back", self)
@@ -71,6 +71,7 @@ class ViewTeamPage(PageTemplate):
         try:
             os.rename(old_db_path, new_db_path)
             self.main_window.db.set_db_path(new_db_path)
+            self.main_window.db.update_team_players(players)
         except OSError as e:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Critical)
@@ -79,6 +80,13 @@ class ViewTeamPage(PageTemplate):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
             return
+        except Exception as e:
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("Players Update Failed")
+            msg_box.setText(f"Failed to update team players database file:\n{e}")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
 
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.NoIcon)
@@ -94,7 +102,7 @@ class ModifyTeamDialog(QDialog):
 
         self.setWindowTitle("Modify Team")
 
-        self.setFixedSize(400, 400)
+        self.setFixedSize(500, 500)
 
         if players is None:
             players = []
@@ -140,17 +148,17 @@ class ModifyTeamDialog(QDialog):
             aliases = player.get('aliases', '')
             self.add_player_field(name, aliases)
 
-    def add_player_field(self, name, aliases):
+    def add_player_field(self, name=None, aliases=None):
         player_layout = QHBoxLayout()
 
         player_input = QLineEdit(self)
         player_input.setPlaceholderText("Player Name")
-        player_input.setText(name)
+        player_input.setText(name) if name else None
         player_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
 
         alias_input = QLineEdit(self)
         alias_input.setPlaceholderText("Player Alias (comma separated)")
-        alias_input.setText(aliases)
+        alias_input.setText(aliases) if aliases else None
         alias_input.setStyleSheet("padding: 10px; font-size: 14px; border: 1px solid #ccc;")
 
         player_layout.addWidget(player_input)

@@ -32,7 +32,7 @@ class DBHelper:
         try:
             self.connect()
             query = """
-                SELECT tp.name, GROUP_CONCAT(pa.alias, ',') AS aliases
+                SELECT tp.id, tp.name, GROUP_CONCAT(pa.alias, ',') AS aliases
                 FROM team_players tp
                 LEFT JOIN player_aliases pa ON tp.id = pa.player_id
                 GROUP BY tp.name;
@@ -41,7 +41,7 @@ class DBHelper:
             players = self.cursor.fetchall()
             self.close()
 
-            return [{'name': name, 'aliases': aliases} for name, aliases in players]
+            return [{'id': player_id, 'name': name, 'aliases': aliases} for player_id, name, aliases in players]
 
         except sqlite3.Error as e:
             self.close()
@@ -50,11 +50,70 @@ class DBHelper:
     def get_competition_types(self):
         try:
             self.connect()
-            query = "SELECT type FROM competition_types"
+            query = "SELECT id, type FROM competition_types"
             self.cursor.execute(query)
             types = self.cursor.fetchall()
             self.close()
-            return [t[0] for t in types]
+            return types
+        except sqlite3.Error as e:
+            self.close()
+            return [f"Error querying {self.db_path}: {e}"]
+
+    def get_series(self):
+        try:
+            self.connect()
+            query = """
+                SELECT 
+                    g.id, 
+                    g.game_name, 
+                    ct.type AS game_type,
+                    g.series, 
+                    MIN(m.timestamp) AS earliest_timestamp
+                FROM series g
+                JOIN competition_types ct ON g.game_type_id = ct.id
+                JOIN games m ON g.id = m.game_id
+                GROUP BY g.id
+                ORDER BY earliest_timestamp DESC
+            """
+            self.cursor.execute(query)
+            series = self.cursor.fetchall()
+            self.close()
+            return series
+        except sqlite3.Error as e:
+            self.close()
+            return [f"Error querying {self.db_path}: {e}"]
+
+    def get_games(self):
+        try:
+            self.connect()
+            query = """
+                SELECT 
+                    m.id AS map_id, 
+                    m.map_name, 
+                    m.total_rounds, 
+                    m.timestamp, 
+                    g.game_name, 
+                    ct.type AS game_type_name
+                FROM games m
+                JOIN series g ON m.game_id = g.id
+                JOIN competition_types ct ON g.game_type_id = ct.id
+            """
+            self.cursor.execute(query)
+            series = self.cursor.fetchall()
+            self.close()
+            return series
+        except sqlite3.Error as e:
+            self.close()
+            return [f"Error querying {self.db_path}: {e}"]
+
+    def get_distinct_map_names(self):
+        try:
+            self.connect()
+            query = "SELECT DISTINCT map_name FROM games ORDER BY map_name ASC"
+            self.cursor.execute(query)
+            map_names = self.cursor.fetchall()
+            self.close()
+            return [map[0] for map in map_names]
         except sqlite3.Error as e:
             self.close()
             return [f"Error querying {self.db_path}: {e}"]
@@ -70,6 +129,31 @@ class DBHelper:
             self.close()
             return [f"Error querying {self.db_path}: {e}"]
 
+    def update_team_players(self, players):
+        try:
+            self.connect()
+
+            self.cursor.execute("DELETE FROM team_players")
+            self.cursor.execute("DELETE FROM player_aliases")
+
+            for player in players:
+                name = player[0]
+                alias_list = [alias.strip() for alias in player[1].split(",")]
+
+                self.cursor.execute("INSERT INTO team_players (name) VALUES (?)", (name,))
+                player_id = self.cursor.lastrowid
+
+                for alias in alias_list:
+                    self.cursor.execute("INSERT INTO player_aliases (player_id, alias) VALUES (?, ?)", (player_id, alias))
+
+                self.conn.commit()
+
+            self.conn.commit()
+            self.close()
+        except sqlite3.Error as e:
+            self.close()
+            raise Exception(f"Error {self.db_path}: {e}")
+
     def insert_new_game(self, game_name, game_type, series):
         try:
             self.connect()
@@ -83,7 +167,7 @@ class DBHelper:
 
             game_type_id = result[0]
 
-            query = "INSERT INTO games (game_name, game_type_id, series) VALUES (?, ?, ?)"
+            query = "INSERT INTO series (game_name, game_type_id, series) VALUES (?, ?, ?)"
             self.cursor.execute(query, (game_name, game_type_id, series))
             self.conn.commit()
 
@@ -99,7 +183,7 @@ class DBHelper:
     def insert_new_map(self, map_name, total_rounds, timestamp, game_id):
         try:
             self.connect()
-            query = "INSERT INTO maps (map_name, total_rounds, timestamp, game_id) VALUES (?, ?, ?, ?)"
+            query = "INSERT INTO games (map_name, total_rounds, timestamp, game_id) VALUES (?, ?, ?, ?)"
             self.cursor.execute(query, (map_name, total_rounds, timestamp, game_id))
             self.conn.commit()
 
@@ -202,7 +286,7 @@ class DBHelper:
         """)
 
         cursor.execute("""
-            CREATE TABLE games (
+            CREATE TABLE series (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_name TEXT NOT NULL,
                 game_type_id INTEGER NOT NULL,
@@ -212,13 +296,13 @@ class DBHelper:
         """)
 
         cursor.execute("""
-            CREATE TABLE maps (
+            CREATE TABLE games (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 map_name TEXT NOT NULL,
                 total_rounds INTEGER NOT NULL,
                 timestamp INTEGER NOT NULL,
                 game_id INTEGER NOT NULL,
-                FOREIGN KEY (game_id) REFERENCES games(id)
+                FOREIGN KEY (game_id) REFERENCES series(id)
             )
         """)
 
@@ -231,7 +315,7 @@ class DBHelper:
                 map_id INTEGER NOT NULL,
                 team_id INTEGER NOT NULL,
                 side_start TEXT NOT NULL,
-                FOREIGN KEY (map_id) REFERENCES maps(id)
+                FOREIGN KEY (map_id) REFERENCES games(id)
             )
         """)
 
@@ -287,18 +371,7 @@ class DBHelper:
 
         print(f"Database {db_path} created successfully!")
 
-    def modify_team_details(self):
-        # TODO:
-        pass
-
-    def get_map_stats(self):
-        """
-        Gets stats of the maps played
-        :return:
-        """
-        pass
-
-    def get_player_stats(self, game_id, game_type_id, map_id):
+    def get_player_stats(self, series_id=None, game_type_id=None, game_id=None, map_name=None, player_name=None):
         """
         Gets the players in the team
         Outputs these player's stats from a type (Global, Competition, Certain Game)
@@ -309,12 +382,16 @@ class DBHelper:
 
             clauses = ""
 
-            if game_id is not None:
-                clauses = f"WHERE g.id = {game_id}"
+            if series_id is not None:
+                clauses = f"WHERE g.id = {series_id}"
             elif game_type_id is not None:
                 clauses = f"WHERE g.game_type_id = {game_type_id}"
-            elif map_id is not None:
-                clauses = f"WHERE m.id = {map_id}"
+            elif game_id is not None:
+                clauses = f"WHERE m.id = {game_id}"
+            elif map_name is not None:
+                clauses = f"WHERE m.map_name = '{map_name}'"
+            elif player_name is not None:
+                clauses = f"WHERE tp.name = '{player_name}'"
 
             query = f"""
                 SELECT
@@ -352,8 +429,8 @@ class DBHelper:
                     SUM(p.defuses) AS total_defuses
                 FROM players p
                 JOIN teams t ON p.team_id = t.id
-                JOIN maps m ON t.map_id = m.id
-                JOIN games g ON m.game_id = g.id
+                JOIN games m ON t.map_id = m.id
+                JOIN series g ON m.game_id = g.id
                 JOIN player_aliases pa ON pa.alias = p.username
                 JOIN team_players tp ON tp.id = pa.player_id
                 {clauses}
@@ -370,18 +447,22 @@ class DBHelper:
             self.close()
             return [f"Error querying {self.db_path}: {e}"]
 
-    def get_map_stats(self, game_id, game_type_id, map_id):
+    def get_map_stats(self, series_id=None, game_type_id=None, game_id=None, map_name=None, player_name=None):
         try:
             self.connect()
 
             clauses = ""
 
-            if game_id is not None:
-                clauses = f"WHERE g.id = {game_id}"
+            if series_id is not None:
+                clauses = f"WHERE g.id = {series_id}"
             elif game_type_id is not None:
                 clauses = f"WHERE g.game_type_id = {game_type_id}"
-            elif map_id is not None:
-                clauses = f"WHERE m.id = {map_id}"
+            elif game_id is not None:
+                clauses = f"WHERE m.id = {game_id}"
+            elif map_name is not None:
+                clauses = f"WHERE m.map_name = '{map_name}'"
+            elif player_name is not None:
+                clauses = f"WHERE tp.name = '{player_name}'"
 
             query = f"""
                 WITH player_matches AS (
@@ -396,8 +477,8 @@ class DBHelper:
                     JOIN team_players tp ON tp.id = pa.player_id
                     JOIN players p ON p.username = pa.alias
                     JOIN teams t ON p.team_id = t.id
-                    JOIN maps m ON m.id = t.map_id
-                    JOIN games g ON m.game_id = g.id
+                    JOIN games m ON m.id = t.map_id
+                    JOIN series g ON m.game_id = g.id
                     {clauses}
                 ),
                 all_rounds AS (
@@ -419,6 +500,7 @@ class DBHelper:
                 GROUP BY pm.map_name
                 ORDER BY pm.map_name;
             """
+
 
             self.cursor.execute(query)
             data = self.cursor.fetchall()

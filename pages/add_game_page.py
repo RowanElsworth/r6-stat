@@ -98,7 +98,7 @@ class AddGamePage(PageTemplate):
 
         # Populate the game type combobox
         self.game_type_combobox.clear()
-        for game_type in self.game_types:
+        for game_type_id, game_type in self.game_types:
             self.game_type_combobox.addItem(game_type)
 
     def process_game(self):
@@ -122,7 +122,7 @@ class AddGamePage(PageTemplate):
         for map_path in games_to_process_paths:
             print(f"Processing folder: {map_path}")
 
-            command = ['./dependencies/r6-dissect', map_path, '-o', 'game.json']
+            command = ['./dependencies/r6-dissect.exe', map_path, '-o', 'game.json']
 
             try:
                 result = subprocess.run(command, check=True, capture_output=True, text=True)
