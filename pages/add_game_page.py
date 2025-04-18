@@ -1,9 +1,19 @@
 import os
+import sys
 from datetime import datetime
 import subprocess
 from PyQt6.QtWidgets import QVBoxLayout, QPushButton, QLabel, QTextEdit, QComboBox, QLineEdit, QMessageBox
 from tools import analyser
 from pages.page_template import PageTemplate
+
+def get_dissect_path():
+    if hasattr(sys, '_MEIPASS'):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, "dependencies", "r6-dissect.exe")
+
 
 class AddGamePage(PageTemplate):
     def __init__(self, main_window):
@@ -113,6 +123,12 @@ class AddGamePage(PageTemplate):
         if game_type not in self.game_types:
             self.main_window.db.insert_new_competition_type(game_type)
 
+        # Lock UI
+        self.add_games_button.setEnabled(False)
+        self.add_games_button_no.setEnabled(False)
+        self.game_name_input.setEnabled(False)
+        self.game_type_combobox.setEnabled(False)
+
         # Process the selected games
         games_to_process_paths = [os.path.join(self.dir_path, folder[0]) for folder in self.folders[-self.series:]]
 
@@ -122,16 +138,25 @@ class AddGamePage(PageTemplate):
         for map_path in games_to_process_paths:
             print(f"Processing folder: {map_path}")
 
-            command = ['./dependencies/r6-dissect.exe', map_path, '-o', 'game.json']
+            output_process_path = r"r6-stat_data/game.json"
+
+            command = [get_dissect_path(), map_path, '-o', output_process_path]
 
             try:
-                result = subprocess.run(command, check=True, capture_output=True, text=True)
+                result = subprocess.run(command, check=True, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
                 print(f"Command Output: {result.stdout}")
             except subprocess.CalledProcessError as e:
                 self.show_message("Error", f"Error while processing map: {e.stderr}", QMessageBox.Icon.Critical)
+
+                # Unlock UI
+                self.add_games_button.setEnabled(True)
+                self.add_games_button_no.setEnabled(True)
+                self.game_name_input.setEnabled(True)
+                self.game_type_combobox.setEnabled(True)
+
                 return
 
-            game, raw_data = analyser.run()
+            game, raw_data = analyser.run(output_process_path)
 
             teams = game.teams
 
@@ -152,6 +177,19 @@ class AddGamePage(PageTemplate):
                         player.entry_kills, player.entry_deaths, player.entry_diff, player.survival, player.trade_kills,
                         player.trade_deaths, player.trade_diff, player.clutches, player.plants, player.defuses, player.rating
                     )
+
+        if os.path.exists("r6-stat_data/game.json"):
+            os.remove("r6-stat_data/game.json")
+
+        self.show_message("Success", "Games have been processed successfully!", QMessageBox.Icon.Information)
+
+        # Unlock UI
+        self.add_games_button.setEnabled(True)
+        self.add_games_button_no.setEnabled(True)
+        self.game_name_input.setEnabled(True)
+        self.game_type_combobox.setEnabled(True)
+
+        self.main_window.switch_to_view_team_page()
 
     def show_message(self, title, message, icon):
         """Show a message box with a title, message, and icon."""

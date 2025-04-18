@@ -348,8 +348,8 @@ def print_team_stats(team):
 
     print(tabulate(player_data, headers=headers, tablefmt="pretty"))
 
-def run():
-    with open("game.json", "r") as file:
+def run(path):
+    with open(path, "r") as file:
         data = json.load(file)
         game = init_game(data)
         init_teams(data, game)

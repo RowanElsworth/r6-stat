@@ -8,6 +8,9 @@ from pages.page_template import PageTemplate
 class MainPage(PageTemplate):
     def __init__(self, main_window):
         super().__init__()
+
+        self.no_teams_label = None
+
         self.layout = QVBoxLayout()
         self.layout.setContentsMargins(20, 20, 20, 20)
 
@@ -62,6 +65,7 @@ class MainPage(PageTemplate):
                 exit(1)
 
     def fetch_players(self):
+
         data_directory = './r6-stat_data'
 
         teams_data = []
@@ -83,6 +87,10 @@ class MainPage(PageTemplate):
                 if players:
                     teams_data.append((team_name, players, db_path))
 
+        if self.no_teams_label:
+            self.no_teams_label.deleteLater()
+            self.no_teams_label = None
+
         if teams_data:
             for team_name, players, db_path in teams_data:
                 team_button_text = f"{team_name}\n{', '.join(players)}"
@@ -97,7 +105,8 @@ class MainPage(PageTemplate):
                 )
                 self.team_buttons_layout.addWidget(button)
         else:
-            self.create_text("No teams found. Click 'Add New Team' to add a new team.")
+            self.no_teams_label = QLabel("No teams found. Click 'Add New Team' to add a new team.", self)
+            self.team_buttons_layout.addWidget(self.no_teams_label)
 
     def show_add_team_dialog(self):
         dialog = AddTeamDialog(self)
@@ -108,7 +117,7 @@ class MainPage(PageTemplate):
                 self.add_team(team_name, players)
 
     def add_team(self, team_name, players):
-        data_directory = './data'
+        data_directory = './r6-stat_data'
 
         if not os.path.exists(data_directory):
             os.makedirs(data_directory)
