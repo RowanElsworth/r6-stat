@@ -106,9 +106,11 @@ class AddGamePage(PageTemplate):
         # Fetch game types from the database
         self.game_types = self.main_window.db.get_competition_types()
 
+        self.game_types = [gt[1] for gt in self.game_types]
+
         # Populate the game type combobox
         self.game_type_combobox.clear()
-        for game_type_id, game_type in self.game_types:
+        for game_type in self.game_types:
             self.game_type_combobox.addItem(game_type)
 
     def process_game(self):
