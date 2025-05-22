@@ -55,12 +55,20 @@ class MainPage(PageTemplate):
                 self, "Select Data Directory", os.getcwd()
             )
 
-            if selected_dir and os.path.normpath(selected_dir).endswith(r"Tom Clancy's Rainbow Six Siege\MatchReplay"):
-                settings.setValue("default_path", selected_dir)
+            if selected_dir:
+                normalised = os.path.normpath(os.path.normpath(selected_dir))
+                if os.path.basename(normalised) == "MatchReplay":
+                    settings.setValue("default_path", selected_dir)
+                else:
+                    QMessageBox.warning(
+                        self, "Invalid Directory Selected",
+                        "The selected directory is not the MatchReplay folder. The program will exit."
+                    )
+                    exit(1)
             else:
                 QMessageBox.warning(
                     self, "No Directory Selected",
-                    "No valid directory was selected. The program will exit."
+                    "No directory was selected. The program will exit."
                 )
                 exit(1)
 

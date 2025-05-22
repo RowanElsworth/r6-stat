@@ -21,7 +21,7 @@ class MyApp(QMainWindow):
         self.series_selector = None
 
         # Set up the window
-        self.setWindowTitle('SQLite Database Player Fetcher')
+        self.setWindowTitle('R6 Stat')
         self.setGeometry(100, 100, 600, 400)
 
         self.stack = QStackedWidget()

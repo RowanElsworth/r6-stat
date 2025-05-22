@@ -60,7 +60,7 @@ class ViewTeamPage(PageTemplate):
                 self.update_team(team_name, players)
 
     def update_team(self, team_name, players):
-        data_directory = './data'
+        data_directory = './r6-stat_data'
 
         if not os.path.exists(data_directory):
             os.makedirs(data_directory)

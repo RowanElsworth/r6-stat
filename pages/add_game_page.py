@@ -2,6 +2,8 @@ import os
 import sys
 from datetime import datetime
 import subprocess
+
+from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import QVBoxLayout, QPushButton, QLabel, QTextEdit, QComboBox, QLineEdit, QMessageBox
 from tools import analyser
 from pages.page_template import PageTemplate
@@ -24,7 +26,8 @@ class AddGamePage(PageTemplate):
         self.series = None  # 1: bo1, 2: bo2, 3: bo3
         self.folders = None
         self.game_types = []
-        self.dir_path = r"C:\Program Files (x86)\Steam\steamapps\common\Tom Clancy's Rainbow Six Siege\MatchReplay"
+        self.settings = QSettings("R6Stat", "R6Stat")
+        self.dir_path = self.settings.value("default_path")
 
         self.main_window = main_window
 
@@ -85,6 +88,7 @@ class AddGamePage(PageTemplate):
         self.team, self.players = self.main_window.get_team()
 
         # Get directories containing game replays
+        print(self.dir_path)
         self.folders = [
             (f, os.path.getmtime(os.path.join(self.dir_path, f)))
             for f in os.listdir(self.dir_path)
@@ -181,7 +185,8 @@ class AddGamePage(PageTemplate):
                     )
 
         if os.path.exists("r6-stat_data/game.json"):
-            os.remove("r6-stat_data/game.json")
+            pass
+            # os.remove("r6-stat_data/game.json")
 
         self.show_message("Success", "Games have been processed successfully!", QMessageBox.Icon.Information)
 
